@@ -1,0 +1,19 @@
+﻿<common:ApplicationWindow x:Class="MqttTestClient.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MqttTestClient"
+        xmlns:common="clr-namespace:MqttTest.Common;assembly=Common"
+        mc:Ignorable="d"
+        Background="{x:Static SystemColors.ControlBrush}"
+        Title="MQTT Client" Height="300" Width="600">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <common:StatusControl Name="StatusPane" Margin="5"/>
+        <Button Content="Pause/Continue" Grid.Row="1" Name="BPause" Margin="5" Click="BPause_Click" HorizontalAlignment="Left"/>
+    </Grid>
+</common:ApplicationWindow>
