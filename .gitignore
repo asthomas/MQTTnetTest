@@ -1,2 +1,8 @@
 .vs/
 packages/
+Common/bin/Debug/PropertyChanged.xml
+Common/obj/
+MqttClient/bin/
+MqttClient/obj/
+MqttServer/bin/
+MqttServer/obj/

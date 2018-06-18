@@ -1,7 +1,9 @@
 ﻿using MQTTnet.Diagnostics;
+using MQTTnet.Protocol;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -29,7 +31,8 @@ namespace MqttTest.Common
         public double MessageRate { get; set; }
         public string Status { get; private set; }
         public string CodeStyle { get; set; }
-        public bool IsSync = true;
+        public bool IsSync { get { return CodeStyle.Equals("synchronous", StringComparison.InvariantCultureIgnoreCase); } }
+        public double CpuUsage { get; set; }
 
         private int _OutOfOrderCount;
         public int OutOfOrderCount { get; set; }
@@ -39,6 +42,8 @@ namespace MqttTest.Common
 
         private int _DuplicateValueCount;
         public int DuplicateValueCount { get; set; }
+
+        public MqttQualityOfServiceLevel QualityOfService { get; set; }
 
         protected DateTime LastWindowUpdate = DateTime.Now - new TimeSpan(0,0,30);
         private int _LastMessageNumber = -1;
@@ -54,12 +59,28 @@ namespace MqttTest.Common
         private bool HavePreviousHistory = false;
         private int HistoryNext = 0;
 
+        private PerformanceCounter CpuCounter = new PerformanceCounter("Process", "% Processor Time", Process.GetCurrentProcess().ProcessName);
+        private Timer CpuTimer;
+
         public ApplicationWindow()
         {
             MqttNetGlobalLogger.LogMessagePublished += MqttNetGlobalLogger_LogMessagePublished;
             Loaded += ApplicationWindow_Loaded;
             if (Args.Contains("-a"))
-                IsSync = false;
+                CodeStyle = "asynchronous";
+            else
+                CodeStyle = "synchronous";
+            CpuTimer = new Timer(CpuTimerTick, null, 2000, 2000);
+
+            Closing += (s, e) => CpuTimer.Dispose();
+        }
+
+        private void CpuTimerTick(object state)
+        {
+            this.Dispatcher.BeginInvoke((Action)(() =>
+            {
+                CpuUsage = CpuCounter.NextValue();
+            }));
         }
 
         public void RunInUiThread(Lambda code)
@@ -80,7 +101,7 @@ namespace MqttTest.Common
             }
         }
 
-        private void StatusPane_ResetClicked(object sender, EventArgs e)
+        public void ResetStats()
         {
             _MessageCount = _SentCount = _ReceivedCount = 0;
             MessageCount = SentCount = ReceivedCount = 0;
@@ -92,9 +113,14 @@ namespace MqttTest.Common
             MessageHistoryPrevious = null;
             HavePreviousHistory = false;
             HistoryNext = 0;
-    }
+        }
 
-    private void MqttNetGlobalLogger_LogMessagePublished(object sender, MqttNetLogMessagePublishedEventArgs e)
+        private void StatusPane_ResetClicked(object sender, EventArgs e)
+        {
+            ResetStats();
+        }
+
+        private void MqttNetGlobalLogger_LogMessagePublished(object sender, MqttNetLogMessagePublishedEventArgs e)
         {
             if (e.TraceMessage.Level == MqttNetLogLevel.Error 
                 || e.TraceMessage.Level == MqttNetLogLevel.Warning)
