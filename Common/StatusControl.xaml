@@ -5,9 +5,12 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:MqttTest.Common"
              mc:Ignorable="d" 
+             x:Name="ThisWindow"
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -30,15 +33,17 @@
         <TextBlock Text="Sent Count" Grid.Row="1" Margin="0,0,10,0"/>
         <TextBlock Text="Received Count" Grid.Row="2" Margin="0,0,10,0"/>
         <TextBlock Text="Message Count" Grid.Row="3" Margin="0,0,10,0"/>
-        <TextBlock Text="Performance" Grid.Row="4" Margin="0,0,10,0"/>
+        <TextBlock Text="Performance (msg/s)" Grid.Row="4" Margin="0,0,10,0"/>
         <TextBlock Text="Code Style" Grid.Row="5" Margin="0,0,10,0"/>
-        <TextBlock Text="Last Message ID" Grid.Row="6" Margin="0,0,10,0"/>
-        <TextBlock Text="Out-of-order Messages" Grid.Row="7" Margin="0,0,10,0"/>
-        <TextBlock Text="Missing Messages" Grid.Row="8" Margin="0,0,10,0"/>
-        <TextBlock Text="Duplicate Messages" Grid.Row="9" Margin="0,0,10,0"/>
-        <TextBlock Text="Status" Grid.Row="10" Margin="0,0,10,0"/>
+        <TextBlock Text="Quality of Service" Grid.Row="6" Margin="0,0,10,0"/>
+        <TextBlock Text="Last Message ID" Grid.Row="7" Margin="0,0,10,0"/>
+        <TextBlock Text="Out-of-order Messages" Grid.Row="8" Margin="0,0,10,0"/>
+        <TextBlock Text="Missing Messages" Grid.Row="9" Margin="0,0,10,0"/>
+        <TextBlock Text="Duplicate Messages" Grid.Row="10" Margin="0,0,10,0"/>
+        <TextBlock Text="Status" Grid.Row="11" Margin="0,0,10,0"/>
+        <TextBlock Text="Cpu Usage (% of 1 core)" Grid.Row="12" Margin="0,0,10,0"/>
 
-        <StackPanel Orientation="Horizontal" Grid.Row="11" Margin="0,10,0,0">
+        <StackPanel Orientation="Horizontal" Grid.Row="13" Margin="0,10,0,0">
             <Button Content="Reset Stats" Name="BReset" Click="BReset_Click"/>
         </StackPanel>
 
@@ -47,11 +52,13 @@
         <TextBlock Text="{Binding ReceivedCount}" Grid.Row="2" Grid.Column="1"/>
         <TextBlock Text="{Binding MessageCount}" Grid.Row="3" Grid.Column="1"/>
         <TextBlock Text="{Binding MessageRate}" Grid.Row="4" Grid.Column="1"/>
-        <TextBlock Text="{Binding CodeStyle}" Grid.Row="5" Grid.Column="1"/>
-        <TextBlock Text="{Binding LastMessageNumber}" Grid.Row="6" Grid.Column="1"/>
-        <TextBlock Text="{Binding OutOfOrderCount}" Grid.Row="7" Grid.Column="1"/>
-        <TextBlock Text="{Binding MissingValueCount}" Grid.Row="8" Grid.Column="1"/>
-        <TextBlock Text="{Binding DuplicateValueCount}" Grid.Row="9" Grid.Column="1"/>
-        <TextBlock Text="{Binding Status}" Grid.Row="10" Grid.Column="1"/>
+        <ComboBox SelectedValue="{Binding CodeStyle}" Grid.Row="5" Grid.Column="1" ItemsSource="{Binding CodeStyles,ElementName=ThisWindow}" Name="CBCodeStyle" SelectionChanged="CBCodeStyle_SelectionChanged"/>
+        <ComboBox SelectedValue="{Binding QualityOfService}" Grid.Row="6" Grid.Column="1" ItemsSource="{Binding QosLevels,ElementName=ThisWindow}" Name="CBQos" SelectionChanged="CBQos_SelectionChanged"/>
+        <TextBlock Text="{Binding LastMessageNumber}" Grid.Row="7" Grid.Column="1"/>
+        <TextBlock Text="{Binding OutOfOrderCount}" Grid.Row="8" Grid.Column="1"/>
+        <TextBlock Text="{Binding MissingValueCount}" Grid.Row="9" Grid.Column="1"/>
+        <TextBlock Text="{Binding DuplicateValueCount}" Grid.Row="10" Grid.Column="1"/>
+        <TextBlock Text="{Binding Status}" Grid.Row="11" Grid.Column="1"/>
+        <TextBlock Text="{Binding CpuUsage,StringFormat=0.####}" Grid.Row="12" Grid.Column="1"/>
     </Grid>
 </UserControl>

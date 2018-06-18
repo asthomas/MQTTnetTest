@@ -4,6 +4,7 @@ using MQTTnet.Diagnostics;
 using MQTTnet.Protocol;
 using MqttTest.Common;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -50,7 +51,6 @@ namespace MqttTestClient
         bool IsConnecting;
         Thread CommunicationThread;
         bool Paused = true;
-        MqttQualityOfServiceLevel QoS = MqttQualityOfServiceLevel.AtLeastOnce;
         Dispatcher ClientDispatcher;
         MqttNetLogger Logger;
 
@@ -63,6 +63,21 @@ namespace MqttTestClient
             Logger.LogMessagePublished += Logger_LogMessagePublished;
             CommunicationThread = new Thread(new ThreadStart(StartMqttClient));
             CommunicationThread.Start();
+            QualityOfService = MqttQualityOfServiceLevel.AtMostOnce;
+            StatusPane.QosChanged += StatusPane_QosChanged;
+            StatusPane.CodeStyleChanged += StatusPane_CodeStyleChanged;
+        }
+
+        private void StatusPane_QosChanged (object sender, EventArgs e)
+        {
+            ResetStats();
+            ClientDispatcher.BeginInvoke((Action)(() => Disconnect()), DispatcherPriority.Send);
+        }
+
+        private void StatusPane_CodeStyleChanged(object sender, EventArgs e)
+        {
+            ResetStats();
+            ClientDispatcher.BeginInvoke((Action)(() => Disconnect()), DispatcherPriority.Send);
         }
 
         private void Logger_LogMessagePublished(object sender, MqttNetLogMessagePublishedEventArgs e)
@@ -79,6 +94,11 @@ namespace MqttTestClient
             {
                 ClientDispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
             }
+        }
+
+        private void Disconnect()
+        {
+            Client.Disconnect();
         }
 
         private void StartMqttClient()
@@ -103,6 +123,7 @@ namespace MqttTestClient
         {
             Paused = true;
             SetStatus("Disconnected");
+            ResetStats();
         }
 
         private void ReconnectTimerTick(object state)
@@ -159,7 +180,7 @@ namespace MqttTestClient
                 for (int i = 0; i < DataPointCount; i++)
                 {
                     List<TopicFilter> filters = new List<TopicFilter>();
-                    filters.Add(new TopicFilter(PointName(i), QoS));
+                    filters.Add(new TopicFilter(PointName(i), QualityOfService));
                     if (IsSync)
                         result = Client.Subscribe(filters);
                     else
@@ -176,6 +197,23 @@ namespace MqttTestClient
         private void Client_ApplicationMessageReceived(object sender, MqttApplicationMessageReceivedEventArgs e)
         {
             string strVal = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+            if (strVal.Contains("{"))
+            {
+                JObject json = JsonConvert.DeserializeObject(strVal) as JObject;
+                JToken jsonRoot = json ?? json.Root;
+                if (jsonRoot != null)
+                {
+                    object value = jsonRoot.SelectToken("Value");
+                    if (value != null)
+                    {
+                        strVal = value.ToString();
+                    }
+                    else
+                    {
+                        strVal = "-1";
+                    }
+                }
+            }
             UpdateOutOfOrderCount(strVal);
             UpdateCounts(0, 1);
         }
@@ -218,7 +256,7 @@ namespace MqttTestClient
                                 {
                                     Topic = nvqt.Name,
                                     Payload = Encoding.UTF8.GetBytes(strVal),
-                                    QualityOfServiceLevel = QoS,
+                                    QualityOfServiceLevel = QualityOfService,
                                     Retain = false
                                 }
                             ;

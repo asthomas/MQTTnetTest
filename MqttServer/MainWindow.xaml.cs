@@ -17,6 +17,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace MqttTestServer
 {
@@ -28,6 +29,8 @@ namespace MqttTestServer
         int PlainPort = 1883;
         IMqttServer Server;
         Thread ServerThread;
+        Dispatcher ClientDispatcher;
+        bool IsStopping;
 
         public MainWindow()
         {
@@ -38,14 +41,46 @@ namespace MqttTestServer
 
             ServerThread = new Thread(StartMqttServer);
             ServerThread.Start();
+            QualityOfService = MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce;
+            StatusPane.QosChanged += StatusPane_QosChanged;
+            StatusPane.CodeStyleChanged += StatusPane_CodeStyleChanged;
         }
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            IsStopping = true;
+            Disconnect();
+        }
+
+        private void StatusPane_QosChanged(object sender, EventArgs e)
+        {
+            ResetStats();
+            ClientDispatcher.BeginInvoke((Action)(() => Disconnect()), DispatcherPriority.Send);
+        }
+
+        private void StatusPane_CodeStyleChanged(object sender, EventArgs e)
+        {
+            ResetStats();
+            ClientDispatcher.BeginInvoke((Action)(() => Disconnect()), DispatcherPriority.Send);
+        }
+
+        private void Disconnect()
+        {
+            ClientDispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
+        }
+
+        private void OnServerThreadStopped()
+        {
+            if (!IsStopping)
+            {
+                ServerThread = new Thread(StartMqttServer);
+                ServerThread.Start();
+            }
         }
 
         private async void StartMqttServer()
         {
+            ClientDispatcher = Dispatcher.CurrentDispatcher;
             SetStatus("Configuring");
             MqttFactory factory = new MqttFactory();
             MqttServerOptionsBuilder optionsBuilder = new MqttServerOptionsBuilder()
@@ -70,6 +105,15 @@ namespace MqttTestServer
                 await Server.StartAsync(optionsBuilder.Build());
 
             SetStatus("Started");
+            // This will run the event queue forever, until we stop it
+            Dispatcher.Run();
+
+            if (IsSync)
+                Server.Stop();
+            else
+                Server.StopAsync().Wait();
+
+            await Dispatcher.BeginInvoke((Action)(() => OnServerThreadStopped()));
         }
 
         private void Server_Started(object sender, EventArgs e)
