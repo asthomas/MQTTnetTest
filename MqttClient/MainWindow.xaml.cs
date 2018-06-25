@@ -31,10 +31,13 @@ namespace MqttTestClient
         {
 
         }
+
+#if HAVE_SYNC
         public override void Publish(MqttNetLogLevel level, string source, string message, object[] args, Exception ex)
         {
 
         }
+#endif
     }
 
     /// <summary>
@@ -53,6 +56,7 @@ namespace MqttTestClient
         bool Paused = true;
         Dispatcher ClientDispatcher;
         MqttNetLogger Logger;
+        IMqttClientOptions ClientOptions;
 
         public MainWindow()
         {
@@ -98,7 +102,12 @@ namespace MqttTestClient
 
         private void Disconnect()
         {
-            Client.Disconnect();
+#if HAVE_SYNC
+            if (IsSync)
+                Client.Disconnect();
+            else
+#endif
+                Client.DisconnectAsync().Wait();
         }
 
         private void StartMqttClient()
@@ -107,15 +116,18 @@ namespace MqttTestClient
             SetStatus("Configuring");
             Thread.CurrentThread.Name = "Client MQTT Messaging";
 
+#if HAVE_SYNC
             RunInUiThread(() => CodeStyle = IsSync ? "Synchronous" : "Asynchronous");
-
+#else
+            RunInUiThread(() => CodeStyle = "Asynchronous");
+#endif
             MqttFactory factory = new MqttFactory();
             Client = factory.CreateMqttClient(Logger);
             Client.Connected += Client_Connected;
             Client.Disconnected += Client_Disconnected;
             Client.ApplicationMessageReceived += Client_ApplicationMessageReceived;
             ReconnectTimer = new Timer(ReconnectTimerTick, null, 1000, 5000);
-            DataTimer = new Timer(DataTimerTick, null, 100, 20);
+            DataTimer = new Timer(DataTimerTick, null, 100, 10);
             Dispatcher.Run();
         }
 
@@ -152,10 +164,13 @@ namespace MqttTestClient
                         .WithCommunicationTimeout(new TimeSpan(0, 0, 1, 30, 0))
                         ;
 
+                    ClientOptions = optionsBuilder.Build();
+#if HAVE_SYNC
                     if (IsSync)
-                        Client.Connect(optionsBuilder.Build());
+                        Client.Connect(ClientOptions);
                     else
-                        await Client.ConnectAsync(optionsBuilder.Build());
+#endif
+                        await Client.ConnectAsync(ClientOptions);
                 }
                 catch (Exception ex)
                 {
@@ -173,20 +188,25 @@ namespace MqttTestClient
             SetStatus(Client.IsConnected ? "Connected" : "Connection failed");
             try
             {
-                ClientDispatcher.Invoke(() => SendNewData());
-                
-                //List<TopicFilter> filters = new List<TopicFilter>();
-                IList<MqttSubscribeResult> result;
-                for (int i = 0; i < DataPointCount; i++)
+                if (Client.IsConnected)
                 {
-                    List<TopicFilter> filters = new List<TopicFilter>();
-                    filters.Add(new TopicFilter(PointName(i), QualityOfService));
-                    if (IsSync)
-                        result = Client.Subscribe(filters);
-                    else
-                        await Client.SubscribeAsync(filters);
+                    ClientDispatcher.Invoke(() => SendNewData());
+
+                    //List<TopicFilter> filters = new List<TopicFilter>();
+                    IList<MqttSubscribeResult> result;
+                    for (int i = 0; i < DataPointCount; i++)
+                    {
+                        List<TopicFilter> filters = new List<TopicFilter>();
+                        filters.Add(new TopicFilter(PointName(i), QualityOfService));
+#if HAVE_SYNC
+                        if (IsSync)
+                            result = Client.Subscribe(filters);
+                        else
+#endif
+                            await Client.SubscribeAsync(filters);
+                    }
+                    Paused = false;
                 }
-                Paused = false;
             }
             catch (Exception ex)
             {
@@ -260,9 +280,11 @@ namespace MqttTestClient
                                     Retain = false
                                 }
                             ;
-                            if (IsSync)
+#if HAVE_SYNC
+                           if (IsSync)
                                 Client.Publish(message);
                             else
+#endif
                                 await Client.PublishAsync(message);
                         }
                         UpdateCounts(DataPointCount, 0);

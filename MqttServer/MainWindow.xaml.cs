@@ -37,7 +37,11 @@ namespace MqttTestServer
             InitializeComponent();
             DataContext = this;
             Closing += MainWindow_Closing;
+#if HAVE_SYNC
             CodeStyle = IsSync ? "Synchronous" : "Asynchronous";
+#else
+            CodeStyle = "Asynchronous";
+#endif
 
             ServerThread = new Thread(StartMqttServer);
             ServerThread.Start();
@@ -99,18 +103,22 @@ namespace MqttTestServer
             Server.ClientUnsubscribedTopic += Server_ClientUnsubscribedTopic;
             Server.Started += Server_Started;
 
+#if HAVE_SYNC
             if (IsSync)
                 Server.Start(optionsBuilder.Build());
             else
+#endif
                 await Server.StartAsync(optionsBuilder.Build());
 
             SetStatus("Started");
             // This will run the event queue forever, until we stop it
             Dispatcher.Run();
 
+#if HAVE_SYNC
             if (IsSync)
                 Server.Stop();
             else
+#endif
                 Server.StopAsync().Wait();
 
             await Dispatcher.BeginInvoke((Action)(() => OnServerThreadStopped()));

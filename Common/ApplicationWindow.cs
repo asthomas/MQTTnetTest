@@ -31,7 +31,7 @@ namespace MqttTest.Common
         public double MessageRate { get; set; }
         public string Status { get; private set; }
         public string CodeStyle { get; set; }
-        public bool IsSync { get { return CodeStyle.Equals("synchronous", StringComparison.InvariantCultureIgnoreCase); } }
+        public bool IsSync { get { return CodeStyle.Equals("Synchronous", StringComparison.InvariantCultureIgnoreCase); } }
         public double CpuUsage { get; set; }
 
         private int _OutOfOrderCount;
@@ -59,28 +59,63 @@ namespace MqttTest.Common
         private bool HavePreviousHistory = false;
         private int HistoryNext = 0;
 
-        private PerformanceCounter CpuCounter = new PerformanceCounter("Process", "% Processor Time", Process.GetCurrentProcess().ProcessName);
+        private PerformanceCounter CpuCounter = null;
         private Timer CpuTimer;
 
         public ApplicationWindow()
         {
             MqttNetGlobalLogger.LogMessagePublished += MqttNetGlobalLogger_LogMessagePublished;
             Loaded += ApplicationWindow_Loaded;
-            if (Args.Contains("-a"))
-                CodeStyle = "asynchronous";
-            else
-                CodeStyle = "synchronous";
+            GetCpuCounter();
+#if HAVE_SYNC
+            CodeStyle = Args.Contains("-a") ? "Asynchronous" : "Synchronous";
+#else
+            CodeStyle = "Synchronous";
+#endif
             CpuTimer = new Timer(CpuTimerTick, null, 2000, 2000);
 
             Closing += (s, e) => CpuTimer.Dispose();
         }
 
+        private void GetCpuCounter()
+        {
+            string procName = GetProcessInstanceName(Process.GetCurrentProcess().Id);
+            if (!string.IsNullOrEmpty(procName))
+            {
+                CpuCounter = new PerformanceCounter("Process", "% Processor Time", procName);
+            }
+        }
+
+        private string GetProcessInstanceName(int pid)
+        {
+            PerformanceCounterCategory cat = new PerformanceCounterCategory("Process");
+            string procName = Process.GetCurrentProcess().ProcessName;
+            string[] instances = cat.GetInstanceNames().Where(x => x.Contains(procName)).ToArray();
+            foreach (string instance in instances)
+            {
+
+                using (PerformanceCounter cnt = new PerformanceCounter("Process",
+                     "ID Process", instance, true))
+                {
+                    int val = (int)cnt.RawValue;
+                    if (val == pid)
+                    {
+                        return instance;
+                    }
+                }
+            }
+            return null;
+        }
+
         private void CpuTimerTick(object state)
         {
-            this.Dispatcher.BeginInvoke((Action)(() =>
+            if (CpuCounter != null)
             {
-                CpuUsage = CpuCounter.NextValue();
-            }));
+                this.Dispatcher.BeginInvoke((Action)(() =>
+                {
+                    CpuUsage = CpuCounter.NextValue();
+                }));
+            }
         }
 
         public void RunInUiThread(Lambda code)
